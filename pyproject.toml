@@ -1,5 +1,5 @@
 [project]
-name = 'crucible-consumers'
+name = 'ingestion-cloud-consumer'
 version = '0.1.0'
 
 description = "RabbitMQ consumer that runs Crucible ingestion in GCP"

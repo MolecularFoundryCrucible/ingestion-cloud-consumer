@@ -49,7 +49,7 @@ spec:
           value: "projects/776258882599/secrets"
         - name: GCS_CLIENT_ID
           value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
-        image: us-central1-docker.pkg.dev/mf-crucible/crucible-ingestion/main:latest
+        image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/main:latest
         imagePullPolicy: Always
         name: ingestion-consumer
         resources:
@@ -149,7 +149,7 @@ spec:
           value: "projects/776258882599/secrets"
         - name: GCS_CLIENT_ID
           value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
-        image: us-central1-docker.pkg.dev/mf-crucible/crucible-ingestion/main:latest
+        image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/main:latest
         imagePullPolicy: Always
         name: ingestion-consumer
         resources:
@@ -249,7 +249,7 @@ spec:
           value: "projects/776258882599/secrets"
         - name: GCS_CLIENT_ID
           value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
-        image: us-central1-docker.pkg.dev/mf-crucible/crucible-ingestion/main:latest
+        image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/main:latest
         imagePullPolicy: Always
         name: ingestion-consumer
         resources:

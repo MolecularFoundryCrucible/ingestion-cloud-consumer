@@ -47,6 +47,7 @@ def get_credentials_from_env():
 def get_secret(secret_env_var, gcs_secret_name = None, sa_creds: str = None, secret_store = secret_store): 
     from google.oauth2 import service_account
     from google.cloud import secretmanager
+    from dotenv import load_dotenv
     load_dotenv('.env')
     secret = os.environ.get(secret_env_var)
     if secret:
