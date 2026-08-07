@@ -1,0 +1,299 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ingestion-consumer-staging-small
+  name: ingestion-consumer-staging-small
+  namespace: default
+spec:
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: ingestion-consumer-staging-small
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/cpu-limit: "10"
+        gke-gcsfuse/cpu-request: 500m
+        gke-gcsfuse/memory-limit: 1000Gi
+        gke-gcsfuse/memory-request: 1Gi
+        gke-gcsfuse/volumes: "true"
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "8"
+      creationTimestamp: null
+      labels:
+        app: ingestion-consumer-staging-small
+      name: ingestion-consumer-staging-small
+      namespace: default
+    spec:
+      containers:
+      - env:
+        - name: PYTHONUNBUFFERED
+          value: "true"
+        - name: RMQ_ROUTING_SUFFIX
+          value: "staging-small"
+        - name: CRUCIBLE_API_URL
+          value: "https://crucible.lbl.gov/testapi-staging"
+        - name: RMQ_HOST
+          value: '10.128.0.31'
+        - name: RMQ_PORT
+          value: '5672'
+        - name: SECRET_STORE
+          value: "projects/776258882599/secrets"
+        - name: GCS_CLIENT_ID
+          value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
+        image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/staging:latest
+        imagePullPolicy: Always
+        name: ingestion-consumer
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+            ephemeral-storage: 1Gi
+          requests:
+            cpu: 500m
+            memory: 2Gi
+            ephemeral-storage: 1Gi
+        securityContext:
+          capabilities:
+            drop:
+            - NET_RAW
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /mnt/gcs
+          name: cruc-upload-vol2
+          readOnly: true
+        - mountPath: /mnt/gcs-prod
+          name: mf-storage-prod-vol
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: kubernetes.io/arch
+        operator: Equal
+        value: amd64
+      volumes:
+      - name: cruc-upload-vol2
+        persistentVolumeClaim:
+          claimName: cruc-upload-pvc2
+          readOnly: true
+      - name: mf-storage-prod-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-prod-pvc
+          readOnly: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ingestion-consumer-staging-medium
+  name: ingestion-consumer-staging-medium
+  namespace: default
+spec:
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: ingestion-consumer-staging-medium
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/cpu-limit: "10"
+        gke-gcsfuse/cpu-request: 500m
+        gke-gcsfuse/memory-limit: 1000Gi
+        gke-gcsfuse/memory-request: 1Gi
+        gke-gcsfuse/volumes: "true"
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "8"
+      creationTimestamp: null
+      labels:
+        app: ingestion-consumer-staging-medium
+      name: ingestion-consumer-staging-medium
+      namespace: default
+    spec:
+      containers:
+      - env:
+        - name: PYTHONUNBUFFERED
+          value: "true"
+        - name: RMQ_ROUTING_SUFFIX
+          value: "staging-medium"
+        - name: CRUCIBLE_API_URL
+          value: "https://crucible.lbl.gov/testapi-staging"
+        - name: RMQ_HOST
+          value: '10.128.0.31'
+        - name: RMQ_PORT
+          value: '5672'
+        - name: SECRET_STORE
+          value: "projects/776258882599/secrets"
+        - name: GCS_CLIENT_ID
+          value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
+        image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/staging:latest
+        imagePullPolicy: Always
+        name: ingestion-consumer
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 4Gi
+            ephemeral-storage: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 4Gi
+            ephemeral-storage: 2Gi
+        securityContext:
+          capabilities:
+            drop:
+            - NET_RAW
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /mnt/gcs
+          name: cruc-upload-vol2
+          readOnly: true
+        - mountPath: /mnt/gcs-prod
+          name: mf-storage-prod-vol
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: kubernetes.io/arch
+        operator: Equal
+        value: amd64
+      volumes:
+      - name: cruc-upload-vol2
+        persistentVolumeClaim:
+          claimName: cruc-upload-pvc2
+          readOnly: true
+      - name: mf-storage-prod-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-prod-pvc
+          readOnly: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ingestion-consumer-staging-large
+  name: ingestion-consumer-staging-large
+  namespace: default
+spec:
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: ingestion-consumer-staging-large
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        gke-gcsfuse/cpu-limit: "10"
+        gke-gcsfuse/cpu-request: 500m
+        gke-gcsfuse/memory-limit: 1000Gi
+        gke-gcsfuse/memory-request: 1Gi
+        gke-gcsfuse/volumes: "true"
+        autoscaling.knative.dev/minScale: "1"
+        autoscaling.knative.dev/maxScale: "10"
+        autoscaling.knative.dev/target: "8"
+      creationTimestamp: null
+      labels:
+        app: ingestion-consumer-staging-large
+      name: ingestion-consumer-staging-large
+      namespace: default
+    spec:
+      containers:
+      - env:
+        - name: PYTHONUNBUFFERED
+          value: "true"
+        - name: RMQ_ROUTING_SUFFIX
+          value: "staging-large"
+        - name: CRUCIBLE_API_URL
+          value: "https://crucible.lbl.gov/testapi-staging"
+        - name: RMQ_HOST
+          value: '10.128.0.31'
+        - name: RMQ_PORT
+          value: '5672'
+        - name: SECRET_STORE
+          value: "projects/776258882599/secrets"
+        - name: GCS_CLIENT_ID
+          value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
+        image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/staging:latest
+        imagePullPolicy: Always
+        name: ingestion-consumer
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 8Gi
+            ephemeral-storage: 2Gi
+          requests:
+            cpu: 1000m
+            memory: 8Gi
+            ephemeral-storage: 2Gi
+        securityContext:
+          capabilities:
+            drop:
+            - NET_RAW
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /mnt/gcs
+          name: cruc-upload-vol2
+          readOnly: true
+        - mountPath: /mnt/gcs-prod
+          name: mf-storage-prod-vol
+          readOnly: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccount: default
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 30
+      tolerations:
+      - effect: NoSchedule
+        key: kubernetes.io/arch
+        operator: Equal
+        value: amd64
+      volumes:
+      - name: cruc-upload-vol2
+        persistentVolumeClaim:
+          claimName: cruc-upload-pvc2
+          readOnly: true
+      - name: mf-storage-prod-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-prod-pvc
+          readOnly: true
