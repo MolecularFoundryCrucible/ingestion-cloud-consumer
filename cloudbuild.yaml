@@ -43,8 +43,8 @@ steps:
       - -c
       - |
         for size in small medium large; do
-          kubectl set image deployment/new-ingestion-consumer-${BRANCH_NAME}-$${size} \
-            new-ingestion-consumer=${_IMAGE_PATH}:${SHORT_SHA}
+          kubectl set image deployment/ingestion-consumer-${BRANCH_NAME}-$${size} \
+            ingestion-consumer=${_IMAGE_PATH}:${SHORT_SHA}
         done
     env:
     - CLOUDSDK_COMPUTE_REGION=us-central1

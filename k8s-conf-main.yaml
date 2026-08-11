@@ -2,15 +2,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: new-ingestion-consumer-main-small
-  name: new-ingestion-consumer-main-small
+    app: ingestion-consumer-main-small
+  name: ingestion-consumer-main-small
   namespace: default
 spec:
   progressDeadlineSeconds: 600
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: new-ingestion-consumer-main-small
+      app: ingestion-consumer-main-small
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -29,8 +29,8 @@ spec:
         autoscaling.knative.dev/target: "8"
       creationTimestamp: null
       labels:
-        app: new-ingestion-consumer-main-small
-      name: new-ingestion-consumer-main-small
+        app: ingestion-consumer-main-small
+      name: ingestion-consumer-main-small
       namespace: default
     spec:
       containers:
@@ -51,7 +51,7 @@ spec:
           value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
         image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/main:latest
         imagePullPolicy: Always
-        name: new-ingestion-consumer
+        name: ingestion-consumer
         resources:
           limits:
             cpu: 1000m
@@ -102,15 +102,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: new-ingestion-consumer-main-medium
-  name: new-ingestion-consumer-main-medium
+    app: ingestion-consumer-main-medium
+  name: ingestion-consumer-main-medium
   namespace: default
 spec:
   progressDeadlineSeconds: 600
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: new-ingestion-consumer-main-medium
+      app: ingestion-consumer-main-medium
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -129,8 +129,8 @@ spec:
         autoscaling.knative.dev/target: "8"
       creationTimestamp: null
       labels:
-        app: new-ingestion-consumer-main-medium
-      name: new-ingestion-consumer-main-medium
+        app: ingestion-consumer-main-medium
+      name: ingestion-consumer-main-medium
       namespace: default
     spec:
       containers:
@@ -151,7 +151,7 @@ spec:
           value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
         image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/main:latest
         imagePullPolicy: Always
-        name: new-ingestion-consumer
+        name: ingestion-consumer
         resources:
           limits:
             cpu: 1000m
@@ -202,15 +202,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: new-ingestion-consumer-main-large
-  name: new-ingestion-consumer-main-large
+    app: ingestion-consumer-main-large
+  name: ingestion-consumer-main-large
   namespace: default
 spec:
   progressDeadlineSeconds: 600
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: new-ingestion-consumer-main-large
+      app: ingestion-consumer-main-large
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -229,8 +229,8 @@ spec:
         autoscaling.knative.dev/target: "8"
       creationTimestamp: null
       labels:
-        app: new-ingestion-consumer-main-large
-      name: new-ingestion-consumer-main-large
+        app: ingestion-consumer-main-large
+      name: ingestion-consumer-main-large
       namespace: default
     spec:
       containers:
@@ -251,7 +251,7 @@ spec:
           value: "776258882599-v17f82atu67g16na3oiq6ga3bnudoqrh.apps.googleusercontent.com"
         image: us-central1-docker.pkg.dev/mf-crucible/ingestion-cloud-consumer/main:latest
         imagePullPolicy: Always
-        name: new-ingestion-consumer
+        name: ingestion-consumer
         resources:
           limits:
             cpu: 1000m
