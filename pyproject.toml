@@ -21,4 +21,4 @@ build-backend = "hatchling.build"
 packages = ["ingestion_consumer"]
 
 [tool.uv.sources] 
-crucible-ingestion = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git", branch = "refactor-for-local" }
+crucible-ingestion = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git", branch = "main" }
