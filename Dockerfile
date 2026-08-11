@@ -15,9 +15,5 @@ RUN apt-get update && apt-get install -yq --no-upgrade unzip curl
 COPY . .
 RUN uv sync --locked
 
-# version tracking
-ARG githash
-ENV GITHASH=$githash
-
 # Run our flow script when the container starts
 CMD uv run python -m ingestion_consumer.ingestion_process
