@@ -382,7 +382,7 @@ wheels = [
 [[package]]
 name = "crucible-ingestion"
 version = "0.1.0"
-source = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git?branch=refactor-for-local#1fcfc96ba7be430c10b15c2e8964249b408561bb" }
+source = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git?branch=main#9c538764f6665e5f7357d1fc855b9229d39462e2" }
 dependencies = [
     { name = "aicspylibczi" },
     { name = "h5py" },
@@ -963,7 +963,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "crucible-ingestion", git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git?branch=refactor-for-local" },
+    { name = "crucible-ingestion", git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git?branch=main" },
     { name = "google-auth", specifier = ">=2.49.1" },
     { name = "google-cloud-secret-manager", specifier = ">=2.27.0" },
     { name = "google-cloud-storage", specifier = ">=3.1.0" },
