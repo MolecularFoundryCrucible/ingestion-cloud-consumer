@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -yq --no-upgrade unzip curl
 
 # environment
 COPY . .
-RUN uv sync --locked
+RUN uv sync
 
 # Run our flow script when the container starts
 CMD uv run python -m ingestion_consumer.ingestion_process
