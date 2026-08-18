@@ -5,6 +5,7 @@ version = '0.1.0'
 description = "RabbitMQ consumer that runs Crucible ingestion in GCP"
 requires-python = ">=3.11"
 dependencies = [
+    "crucible-ingestion",
     "google-auth>=2.49.1",
     "google-cloud-secret-manager>=2.27.0",
     "google-cloud-storage>=3.1.0",
@@ -18,3 +19,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["ingestion_consumer"]
+
+[tool.uv.sources]
+crucible-ingestion = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git" }
