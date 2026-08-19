@@ -382,7 +382,7 @@ wheels = [
 [[package]]
 name = "crucible-ingestion"
 version = "0.1.0"
-source = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git#5f5de476322c7bd9df8bcac15c85c29109f83990" }
+source = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion.git#62e05fe5250dcb26a159da1fe200cdc7ca099258" }
 dependencies = [
     { name = "aicspylibczi" },
     { name = "h5py" },
