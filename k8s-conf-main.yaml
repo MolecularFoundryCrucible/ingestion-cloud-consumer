@@ -40,7 +40,7 @@ spec:
         - name: RMQ_ROUTING_SUFFIX
           value: "main-small"
         - name: CRUCIBLE_API_URL
-          value: "https://crucible.lbl.gov/api/v2"
+          value: "https://crucible.lbl.gov/api/v3"
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -140,7 +140,7 @@ spec:
         - name: RMQ_ROUTING_SUFFIX
           value: "main-medium"
         - name: CRUCIBLE_API_URL
-          value: "https://crucible.lbl.gov/api/v2"
+          value: "https://crucible.lbl.gov/api/v3"
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -240,7 +240,7 @@ spec:
         - name: RMQ_ROUTING_SUFFIX
           value: "main-large"
         - name: CRUCIBLE_API_URL
-          value: "https://crucible.lbl.gov/api/v2"
+          value: "https://crucible.lbl.gov/api/v3"
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
