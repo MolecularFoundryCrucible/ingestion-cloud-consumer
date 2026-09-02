@@ -2,26 +2,25 @@ import os
 import json
 import time
 import logging
-from importlib.metadata import distribution
 from google.cloud import storage as gcs
 
 from crucible import CrucibleClient
 from crucible.utils.io import get_tz_isoformat
 from crucible_ingestion import data_ingestion, set_client
+from crucible_ingestion.utils import get_ingestion_githash
 from .cloud import get_secret, setup_pika_client
 
 _GCS_PROD_BUCKET = "mf-storage-prod"
 
 logger = logging.getLogger(__name__)
 
-
-def get_ingestion_githash():
-    try:
-        direct_url = distribution("crucible-ingestion").read_text("direct_url.json")
-        return json.loads(direct_url)["vcs_info"]["commit_id"]
-    except Exception as err:
-        logger.warning(f"Could not resolve crucible-ingestion githash: {err}")
-        return None
+# def get_ingestion_githash():
+#     try:
+#         direct_url = distribution("crucible-ingestion").read_text("direct_url.json")
+#         return json.loads(direct_url)["vcs_info"]["commit_id"]
+#     except Exception as err:
+#         logger.warning(f"Could not resolve crucible-ingestion githash: {err}")
+#         return None
 
 
 ingestion_githash = get_ingestion_githash()
@@ -122,7 +121,8 @@ def callback(ch, method, props, body):
     try:
         ds, ingestion_class = data_ingestion(dataset_to_process = dataset_to_process,
                                              dsid = dsid,
-                                             ingestion_class = specified_ingestor)
+                                             ingestion_class = specified_ingestor, 
+                                             include_file = False)
         
         logger.info(f"{ds=}")
         if ds is None:
