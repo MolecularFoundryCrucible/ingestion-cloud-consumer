@@ -119,13 +119,13 @@ def callback(ch, method, props, body):
 
     ds, ingestion_class = (None,None)
     try:
-        ds, ingestion_class = data_ingestion(dataset_to_process = dataset_to_process,
-                                             dsid = dsid,
-                                             ingestion_class = specified_ingestor, 
-                                             include_file = False)
-        
+        ds, ingestion_class, supported = data_ingestion(dataset_to_process = dataset_to_process,
+                                                        dsid = dsid,
+                                                        ingestion_class = specified_ingestor,
+                                                        include_file = False)
+
         logger.info(f"{ds=}")
-        if ds is None:
+        if not supported:
             client.ingestions.update(reqid, status = "not supported", ingestion_githash = ingestion_githash)
             ch.basic_publish(exchange = '',
                             routing_key= 'not-supported',
