@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+import requests
 from google.cloud import storage as gcs
 
 from crucible import CrucibleClient
@@ -118,11 +119,22 @@ def callback(ch, method, props, body):
 
 
     ds, ingestion_class = (None,None)
+    max_ingest_retries = 5
     try:
-        ds, ingestion_class, supported = data_ingestion(dataset_to_process = dataset_to_process,
-                                                        dsid = dsid,
-                                                        ingestion_class = specified_ingestor,
-                                                        include_file = False)
+        for attempt in range(1, max_ingest_retries + 1):
+            try:
+                ds, ingestion_class, supported = data_ingestion(dataset_to_process = dataset_to_process,
+                                                                dsid = dsid,
+                                                                ingestion_class = specified_ingestor,
+                                                                include_file = False)
+                break
+            except requests.exceptions.HTTPError as err:
+                not_found = err.response is not None and err.response.status_code == 404
+                if not_found and attempt < max_ingest_retries:
+                    logger.warning(f"[x] Dataset not yet visible, retry {attempt}/{max_ingest_retries}: {err}")
+                    time.sleep(2 ** attempt)
+                    continue
+                raise
 
         logger.info(f"{ds=}")
         if not supported:
