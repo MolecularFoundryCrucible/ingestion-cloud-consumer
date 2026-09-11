@@ -1,0 +1,32 @@
+name: Update crucible-ingestion
+
+on:
+  repository_dispatch:
+    types: [crucible-ingestion-updated]
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run update-crucible-ingestion.sh
+        run: bash update-crucible-ingestion.sh
+
+      - name: Commit and push lockfile
+        run: |
+          if git diff --quiet -- uv.lock pyproject.toml; then
+            echo "No change to uv.lock or pyproject.toml, nothing to push"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add uv.lock pyproject.toml
+          git commit -m "Update crucible-ingestion (${{ github.event.client_payload.sha || 'manual run' }})"
+          git push
