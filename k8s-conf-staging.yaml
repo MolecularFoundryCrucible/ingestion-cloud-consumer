@@ -41,6 +41,8 @@ spec:
           value: "staging-small"
         - name: CRUCIBLE_API_URL
           value: "https://crucible.lbl.gov/testapi-staging"
+        - name: GCS_BUCKET_MOUNTS
+          value: '{"mf-storage-prod": "/mnt/gcs-prod", "mf-storage-staging": "/mnt/gcs-staging"}'
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -141,6 +143,8 @@ spec:
           value: "staging-medium"
         - name: CRUCIBLE_API_URL
           value: "https://crucible.lbl.gov/testapi-staging"
+        - name: GCS_BUCKET_MOUNTS
+          value: '{"mf-storage-prod": "/mnt/gcs-prod", "mf-storage-staging": "/mnt/gcs-staging"}'
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -241,6 +245,8 @@ spec:
           value: "staging-large"
         - name: CRUCIBLE_API_URL
           value: "https://crucible.lbl.gov/testapi-staging"
+        - name: GCS_BUCKET_MOUNTS
+          value: '{"mf-storage-prod": "/mnt/gcs-prod", "mf-storage-staging": "/mnt/gcs-staging"}'
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT

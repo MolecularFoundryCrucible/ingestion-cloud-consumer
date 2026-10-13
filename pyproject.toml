@@ -22,3 +22,8 @@ packages = ["ingestion_consumer"]
 
 [tool.uv.sources]
 crucible-ingestion = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion" }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

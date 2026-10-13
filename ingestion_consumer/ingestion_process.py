@@ -11,7 +11,30 @@ from crucible_ingestion import data_ingestion, set_client
 from crucible_ingestion.utils import get_ingestion_githash
 from .cloud import get_secret, setup_pika_client
 
-_GCS_PROD_BUCKET = "mf-storage-prod"
+# Buckets that are GCS-FUSE mounted read-only and also checked directly via the
+# GCS client to bypass FUSE cache latency. Configured via GCS_BUCKET_MOUNTS (a
+# JSON object of {bucket_name: mount_path}) so a new bucket is a deploy-config
+# change, not a code change; the literal below is only the fallback for a
+# deploy that hasn't set the env var yet.
+_DEFAULT_BUCKET_MOUNTS = {
+    "mf-storage-prod": "/mnt/gcs-prod",
+}
+
+
+def _load_bucket_mounts():
+    raw = os.environ.get("GCS_BUCKET_MOUNTS")
+    if not raw:
+        return dict(_DEFAULT_BUCKET_MOUNTS)
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        logging.getLogger(__name__).error(
+            f"GCS_BUCKET_MOUNTS is not valid JSON ({raw!r}), falling back to defaults"
+        )
+        return dict(_DEFAULT_BUCKET_MOUNTS)
+
+
+_BUCKET_MOUNTS = _load_bucket_mounts()
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +69,42 @@ crucible_apikey = get_secret("CRUCIBLE_APIKEY", "crucible_admin_apikey/versions/
 client = CrucibleClient(api_url=crucible_api_url, api_key=crucible_apikey)
 set_client(client)
 
+
 # Functions ===========================
+def resolve_bucket_and_mount(filename):
+    """(bucket_name, mount_path) if filename names an object in one of the
+    configured buckets, else (None, None). Prefix match is anchored on a
+    trailing '/' so 'mf-storage-prod' can't loosely match
+    'mf-storage-production/...'."""
+    for bucket, mount in _BUCKET_MOUNTS.items():
+        if filename == bucket or filename.startswith(bucket + '/'):
+            return bucket, mount
+    return None, None
+
+
+def resolve_dataset_path(filename):
+    """The local FUSE-mounted path for a message's filename, or None if the
+    prefix isn't recognized."""
+    if filename.startswith('/mnt/gcs'):
+        return filename
+    if filename.startswith('crucible-uploads'):
+        return filename.replace('crucible-uploads', '/mnt/gcs', 1)
+    bucket, mount = resolve_bucket_and_mount(filename)
+    if bucket is not None:
+        return filename.replace(bucket, mount, 1)
+    return None
+
+
 def is_file_lost(message, dataset_to_process, ch, update_status=True):
     reqid = message['reqid']
     filename = message['filename']
 
-    # For prod bucket files, check via GCS client to bypass FUSE cache latency
-    if filename.startswith(_GCS_PROD_BUCKET):
-        blob_name = filename[len(_GCS_PROD_BUCKET) + 1:]
+    bucket_name, _ = resolve_bucket_and_mount(filename)
+    if bucket_name is not None:
+        # Bypass FUSE cache latency for configured buckets.
+        blob_name = filename[len(bucket_name) + 1:]
         try:
-            file_exists = gcs.Client().bucket(_GCS_PROD_BUCKET).blob(blob_name).exists()
+            file_exists = gcs.Client().bucket(bucket_name).blob(blob_name).exists()
         except Exception as e:
             logger.warning(f"GCS client check failed for {blob_name}: {e}, falling back to os.path")
             file_exists = os.path.exists(dataset_to_process)
@@ -85,13 +134,8 @@ def callback(ch, method, props, body):
     message = json.loads(body.decode("utf-8").strip())
     filename = message['filename']
     filename = filename.replace('\\', '/')
-    if filename.startswith('/mnt/gcs'):
-        dataset_to_process = filename
-    elif filename.startswith('crucible-uploads'):
-        dataset_to_process = filename.replace('crucible-uploads', '/mnt/gcs', 1)
-    elif filename.startswith('mf-storage-prod'):
-        dataset_to_process = filename.replace('mf-storage-prod', '/mnt/gcs-prod', 1)
-    else:
+    dataset_to_process = resolve_dataset_path(filename)
+    if dataset_to_process is None:
         logger.error(f"Unexpected filename format, cannot resolve path: {filename}")
         ch.basic_ack(delivery_tag=method.delivery_tag)
         return
@@ -126,7 +170,8 @@ def callback(ch, method, props, body):
                 ds, ingestion_class, supported = data_ingestion(dataset_to_process = dataset_to_process,
                                                                 dsid = dsid,
                                                                 ingestion_class = specified_ingestor,
-                                                                include_file = False)
+                                                                include_file = False,
+                                                                file_name = message.get('file_name'))
                 break
             except requests.exceptions.HTTPError as err:
                 not_found = err.response is not None and err.response.status_code == 404
