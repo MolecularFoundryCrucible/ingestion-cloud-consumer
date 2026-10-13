@@ -6,7 +6,7 @@ Every push to `main` or `staging` triggers Cloud Build (`cloudbuild.yaml`), whic
 
 **A merge to `main` is a production deploy.** It is not staged, gated, or reviewed again after merge — the moment the merge commit lands on `main`, Cloud Build starts rolling it out to production. The same is true of `staging` for the staging consumers.
 
-Separately, `.github/workflows/update-ingestion.yml` listens for a `repository_dispatch` from crucible-ingestion (fired when that repo's main is updated) and auto-commits + pushes a `uv.lock` pin bump straight to whichever branch it runs on, with no PR. That push triggers its own Cloud Build run.
+Separately, `.github/workflows/update-ingestion.yml` listens for a `repository_dispatch` from crucible-ingestion (fired when that repo's main is updated) and auto-commits + pushes a `uv.lock` pin bump straight to whichever branch it runs on, with no PR. That push triggers its own Cloud Build run — **so every merge to crucible-ingestion's main also deploys this repo's production consumers automatically**, on whatever code is currently on this repo's `main` at that moment, independent of and unsynchronized with any deploy already in flight from a push here.
 
 ## Incident: concurrent builds raced on `kubectl set image` (2026-10-13)
 
