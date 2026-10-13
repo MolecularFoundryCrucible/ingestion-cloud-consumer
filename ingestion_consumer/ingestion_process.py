@@ -11,11 +11,7 @@ from crucible_ingestion import data_ingestion, set_client
 from crucible_ingestion.utils import get_ingestion_githash
 from .cloud import get_secret, setup_pika_client
 
-# Buckets that are GCS-FUSE mounted read-only and also checked directly via the
-# GCS client to bypass FUSE cache latency. Configured via GCS_BUCKET_MOUNTS (a
-# JSON object of {bucket_name: mount_path}) so a new bucket is a deploy-config
-# change, not a code change; the literal below is only the fallback for a
-# deploy that hasn't set the env var yet.
+# Fallback for a deploy that hasn't set GCS_BUCKET_MOUNTS yet.
 _DEFAULT_BUCKET_MOUNTS = {
     "mf-storage-prod": "/mnt/gcs-prod",
 }
@@ -26,12 +22,14 @@ def _load_bucket_mounts():
     if not raw:
         return dict(_DEFAULT_BUCKET_MOUNTS)
     try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        logging.getLogger(__name__).error(
-            f"GCS_BUCKET_MOUNTS is not valid JSON ({raw!r}), falling back to defaults"
-        )
-        return dict(_DEFAULT_BUCKET_MOUNTS)
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"GCS_BUCKET_MOUNTS is not valid JSON: {raw!r}") from e
+    if not isinstance(parsed, dict) or not all(
+        isinstance(k, str) and isinstance(v, str) for k, v in parsed.items()
+    ):
+        raise ValueError(f"GCS_BUCKET_MOUNTS must be a JSON object of string->string, got: {raw!r}")
+    return parsed
 
 
 _BUCKET_MOUNTS = _load_bucket_mounts()
@@ -99,8 +97,15 @@ def is_file_lost(message, dataset_to_process, ch, update_status=True):
     reqid = message['reqid']
     filename = message['filename']
 
-    bucket_name, _ = resolve_bucket_and_mount(filename)
-    if bucket_name is not None:
+    bucket_name, mount = resolve_bucket_and_mount(filename)
+    if bucket_name is not None and not os.path.isdir(mount):
+        # The bucket is configured but this pod never got the matching volume
+        # mount (e.g. a GCS_BUCKET_MOUNTS entry added before the k8s rollout) --
+        # a GCS .exists() check would pass even though the file is unreachable
+        # here, so this must short-circuit before consulting GCS at all.
+        logger.error(f"Mount {mount} for bucket {bucket_name} is not available on this pod")
+        file_exists = False
+    elif bucket_name is not None:
         # Bypass FUSE cache latency for configured buckets.
         blob_name = filename[len(bucket_name) + 1:]
         try:
@@ -137,6 +142,8 @@ def callback(ch, method, props, body):
     dataset_to_process = resolve_dataset_path(filename)
     if dataset_to_process is None:
         logger.error(f"Unexpected filename format, cannot resolve path: {filename}")
+        client.ingestions.update(message['reqid'], status="file not found")
+        ch.basic_publish(exchange='', routing_key=f'ingestion-{RMQ_ROUTING_SUFFIX}-failed', body=json.dumps(message))
         ch.basic_ack(delivery_tag=method.delivery_tag)
         return
     specified_ingestor = message['ingestion_class']
