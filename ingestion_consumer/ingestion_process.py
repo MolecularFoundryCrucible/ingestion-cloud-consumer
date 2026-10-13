@@ -71,11 +71,12 @@ set_client(client)
 # Functions ===========================
 def resolve_bucket_and_mount(filename):
     """(bucket_name, mount_path) if filename names an object in one of the
-    configured buckets, else (None, None). Prefix match is anchored on a
-    trailing '/' so 'mf-storage-prod' can't loosely match
-    'mf-storage-production/...'."""
+    configured buckets, else (None, None). Prefix match requires an object
+    key after the bucket name, anchored on a trailing '/' so 'mf-storage-prod'
+    can't loosely match 'mf-storage-production/...', and a bare bucket name
+    with no key doesn't match at all."""
     for bucket, mount in _BUCKET_MOUNTS.items():
-        if filename == bucket or filename.startswith(bucket + '/'):
+        if filename.startswith(bucket + '/'):
             return bucket, mount
     return None, None
 

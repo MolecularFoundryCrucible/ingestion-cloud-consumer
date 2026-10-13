@@ -84,6 +84,12 @@ def test_bucket_prefix_match_does_not_loosely_match_similar_names(bucket_mounts)
     assert bucket_mounts.resolve_dataset_path("mf-storage-production/foo") is None
 
 
+def test_bare_bucket_name_with_no_object_key_is_not_matched(bucket_mounts):
+    # A message naming just the bucket (no object key) is malformed; it must
+    # hit the clean "file not found" path, not resolve to the mount root.
+    assert bucket_mounts.resolve_bucket_and_mount("mf-storage-staging") == (None, None)
+
+
 def test_resolve_bucket_and_mount_identifies_staging_bucket(bucket_mounts):
     bucket, mount = bucket_mounts.resolve_bucket_and_mount("mf-storage-staging/MF123/_files/abcd1234")
     assert bucket == "mf-storage-staging"
