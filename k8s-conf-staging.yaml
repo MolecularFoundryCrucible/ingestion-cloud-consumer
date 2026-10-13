@@ -76,6 +76,9 @@ spec:
         - mountPath: /mnt/gcs-prod
           name: mf-storage-prod-vol
           readOnly: true
+        - mountPath: /mnt/gcs-staging
+          name: mf-storage-staging-vol
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -98,6 +101,10 @@ spec:
       - name: mf-storage-prod-vol
         persistentVolumeClaim:
           claimName: mf-storage-prod-pvc
+          readOnly: true
+      - name: mf-storage-staging-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-staging-pvc
           readOnly: true
 ---
 apiVersion: apps/v1
@@ -178,6 +185,9 @@ spec:
         - mountPath: /mnt/gcs-prod
           name: mf-storage-prod-vol
           readOnly: true
+        - mountPath: /mnt/gcs-staging
+          name: mf-storage-staging-vol
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -200,6 +210,10 @@ spec:
       - name: mf-storage-prod-vol
         persistentVolumeClaim:
           claimName: mf-storage-prod-pvc
+          readOnly: true
+      - name: mf-storage-staging-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-staging-pvc
           readOnly: true
 ---
 apiVersion: apps/v1
@@ -280,6 +294,9 @@ spec:
         - mountPath: /mnt/gcs-prod
           name: mf-storage-prod-vol
           readOnly: true
+        - mountPath: /mnt/gcs-staging
+          name: mf-storage-staging-vol
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -302,4 +319,8 @@ spec:
       - name: mf-storage-prod-vol
         persistentVolumeClaim:
           claimName: mf-storage-prod-pvc
+          readOnly: true
+      - name: mf-storage-staging-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-staging-pvc
           readOnly: true
