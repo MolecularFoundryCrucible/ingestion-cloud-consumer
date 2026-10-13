@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mf-storage-staging-pv
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 500Gi
+  csi:
+    driver: gcsfuse.csi.storage.gke.io
+    volumeAttributes:
+      gcsfuseLoggingSeverity: warning
+    volumeHandle: mf-storage-staging
+  mountOptions:
+  - implicit-dirs
+  storageClassName: mf-storage-staging
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mf-storage-staging-pvc
+  namespace: default
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Gi
+  storageClassName: mf-storage-staging
+  volumeName: mf-storage-staging-pv

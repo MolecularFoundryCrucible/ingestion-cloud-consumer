@@ -41,6 +41,8 @@ spec:
           value: "staging-small"
         - name: CRUCIBLE_API_URL
           value: "https://crucible.lbl.gov/testapi-staging"
+        - name: GCS_BUCKET_MOUNTS
+          value: '{"mf-storage-prod": "/mnt/gcs-prod", "mf-storage-staging": "/mnt/gcs-staging"}'
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -74,6 +76,9 @@ spec:
         - mountPath: /mnt/gcs-prod
           name: mf-storage-prod-vol
           readOnly: true
+        - mountPath: /mnt/gcs-staging
+          name: mf-storage-staging-vol
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -96,6 +101,10 @@ spec:
       - name: mf-storage-prod-vol
         persistentVolumeClaim:
           claimName: mf-storage-prod-pvc
+          readOnly: true
+      - name: mf-storage-staging-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-staging-pvc
           readOnly: true
 ---
 apiVersion: apps/v1
@@ -141,6 +150,8 @@ spec:
           value: "staging-medium"
         - name: CRUCIBLE_API_URL
           value: "https://crucible.lbl.gov/testapi-staging"
+        - name: GCS_BUCKET_MOUNTS
+          value: '{"mf-storage-prod": "/mnt/gcs-prod", "mf-storage-staging": "/mnt/gcs-staging"}'
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -174,6 +185,9 @@ spec:
         - mountPath: /mnt/gcs-prod
           name: mf-storage-prod-vol
           readOnly: true
+        - mountPath: /mnt/gcs-staging
+          name: mf-storage-staging-vol
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -196,6 +210,10 @@ spec:
       - name: mf-storage-prod-vol
         persistentVolumeClaim:
           claimName: mf-storage-prod-pvc
+          readOnly: true
+      - name: mf-storage-staging-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-staging-pvc
           readOnly: true
 ---
 apiVersion: apps/v1
@@ -241,6 +259,8 @@ spec:
           value: "staging-large"
         - name: CRUCIBLE_API_URL
           value: "https://crucible.lbl.gov/testapi-staging"
+        - name: GCS_BUCKET_MOUNTS
+          value: '{"mf-storage-prod": "/mnt/gcs-prod", "mf-storage-staging": "/mnt/gcs-staging"}'
         - name: RMQ_HOST
           value: '10.128.0.31'
         - name: RMQ_PORT
@@ -274,6 +294,9 @@ spec:
         - mountPath: /mnt/gcs-prod
           name: mf-storage-prod-vol
           readOnly: true
+        - mountPath: /mnt/gcs-staging
+          name: mf-storage-staging-vol
+          readOnly: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       schedulerName: default-scheduler
@@ -296,4 +319,8 @@ spec:
       - name: mf-storage-prod-vol
         persistentVolumeClaim:
           claimName: mf-storage-prod-pvc
+          readOnly: true
+      - name: mf-storage-staging-vol
+        persistentVolumeClaim:
+          claimName: mf-storage-staging-pvc
           readOnly: true
