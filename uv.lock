@@ -452,8 +452,8 @@ wheels = [
 
 [[package]]
 name = "crucible-ingestion"
-version = "0.1.0"
-source = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion#3bcd10a3d14f1f671f06ea762340c2ce40ace239" }
+version = "0.2.0"
+source = { git = "https://github.com/MolecularFoundryCrucible/crucible-ingestion#c400c6d206912404c209058bebf7bdfa6b883b43" }
 dependencies = [
     { name = "aicspylibczi" },
     { name = "gdstk" },
