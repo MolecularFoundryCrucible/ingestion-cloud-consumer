@@ -82,3 +82,57 @@ def test_without_gcs_check_only_the_filesystem_is_used(tmp_path, monkeypatch):
     mounts = {"b": str(tmp_path)}
     assert file_exists(f"{tmp_path}/present.h5", "b", mounts, "") is True
     assert file_exists(f"{tmp_path}/absent.h5", "b", mounts, "") is False
+
+
+def object_storage(env=None, **objects):
+    import obstore
+    from obstore.store import MemoryStore
+
+    from crucible_ingestion_worker.config import load_config
+
+    base = {"CRUCIBLE_API_URL": "u", "CRUCIBLE_API_KEY": "k", "RABBITMQ_HOST": "h", "RABBITMQ_PASSWORD": "pw",
+            "QUEUE": "q", "STORAGE_BACKEND": "s3", "STORAGE_BUCKETS": "crucible-files"}
+    base.update(env or {})
+    store = MemoryStore()
+    for key, data in objects.items():
+        obstore.put(store, key, data)
+    made = []
+
+    def make_store(bucket):
+        made.append(bucket)
+        return store
+
+    return storage.ObjectStorage(load_config(base), make_store=make_store), made
+
+
+def test_locate_only_allowed_buckets():
+    objects, _ = object_storage()
+    assert objects.locate("crucible-files/MF1/_files/abc") == ("crucible-files", "MF1/_files/abc")
+    assert objects.locate("other-bucket/MF1/_files/abc") is None
+    assert objects.locate("crucible-files") is None
+    assert objects.locate("crucible-files/") is None
+
+
+def test_locate_is_off_without_a_backend():
+    objects, _ = object_storage({"STORAGE_BACKEND": "", "STORAGE_BUCKETS": ""})
+    assert objects.locate("crucible-files/MF1/_files/abc") is None
+
+
+def test_exists_and_download(tmp_path):
+    objects, made = object_storage(**{"MF1/_files/abc": b"payload"})
+    assert objects.exists("crucible-files", "MF1/_files/abc")
+    assert not objects.exists("crucible-files", "MF1/_files/missing")
+    objects.download("crucible-files", "MF1/_files/abc", str(tmp_path / "out"))
+    assert (tmp_path / "out").read_bytes() == b"payload"
+    assert made == ["crucible-files"], "one client per bucket, reused"
+
+
+@pytest.mark.parametrize("file_name,key,expected", [
+    ("scan.h5", "MF1/_files/abc", "scan.h5"),
+    ("../../etc/passwd", "MF1/_files/abc", "passwd"),
+    ("dir\\scan.dm4", "MF1/_files/abc", "scan.dm4"),
+    (None, "MF1/_files/abc", "abc"),
+    ("..", "MF1/_files/abc", "abc"),
+])
+def test_local_name_keeps_only_a_safe_basename(file_name, key, expected):
+    assert storage.local_name(file_name, key) == expected

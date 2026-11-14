@@ -50,6 +50,13 @@ class Config:
     prefetch_count: int
     storage_mounts: dict
     storage_exists_check: str
+    storage_backend: str
+    storage_buckets: frozenset
+    s3_endpoint_url: Optional[str]
+    s3_region: str
+    s3_access_key_id: Optional[str] = field(repr=False)
+    s3_secret_access_key: Optional[str] = field(repr=False)
+    work_dir: str
     log_level: str
     shutdown_timeout: int
     health_file: Optional[str]
@@ -91,11 +98,28 @@ def _storage_mounts(env: Mapping[str, str]) -> dict:
     return {bucket: directory.rstrip("/") or "/" for bucket, directory in mounts.items()}
 
 
+def _storage_buckets(env: Mapping[str, str], backend: str) -> frozenset:
+    buckets = frozenset(name.strip() for name in env.get("STORAGE_BUCKETS", "").split(",") if name.strip())
+    if backend and not buckets:
+        raise ConfigError("STORAGE_BUCKETS is required with STORAGE_BACKEND: a comma-separated list of the buckets to read")
+    for bucket in buckets:
+        if "/" in bucket:
+            raise ConfigError(f"STORAGE_BUCKETS has an invalid bucket name {bucket!r}")
+    return buckets
+
+
 def load_config(env: Mapping[str, str] = os.environ) -> Config:
     queue = _required(env, "QUEUE")
     exists_check = env.get("STORAGE_EXISTS_CHECK", "")
     if exists_check not in ("", "gcs"):
         raise ConfigError(f"STORAGE_EXISTS_CHECK must be empty or 'gcs', got {exists_check!r}")
+    backend = env.get("STORAGE_BACKEND", "")
+    if backend not in ("", "gcs", "s3"):
+        raise ConfigError(f"STORAGE_BACKEND must be empty, 'gcs' or 's3', got {backend!r}")
+    s3_key_id = read_secret("S3_ACCESS_KEY_ID", env, required=False) if backend == "s3" else None
+    s3_secret = read_secret("S3_SECRET_ACCESS_KEY", env, required=False) if backend == "s3" else None
+    if (s3_key_id is None) != (s3_secret is None):
+        raise ConfigError("Give S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY together, or neither to use the platform's credentials")
     return Config(
         api_url=_required(env, "CRUCIBLE_API_URL"),
         api_key=read_secret("CRUCIBLE_API_KEY", env),
@@ -111,6 +135,13 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         prefetch_count=_integer(env, "PREFETCH_COUNT", 1),
         storage_mounts=_storage_mounts(env),
         storage_exists_check=exists_check,
+        storage_backend=backend,
+        storage_buckets=_storage_buckets(env, backend),
+        s3_endpoint_url=env.get("S3_ENDPOINT_URL") or None,
+        s3_region=env.get("S3_REGION") or "us-east-1",
+        s3_access_key_id=s3_key_id,
+        s3_secret_access_key=s3_secret,
+        work_dir=env.get("WORK_DIR") or "/tmp/work",
         log_level=env.get("LOG_LEVEL") or "INFO",
         shutdown_timeout=_integer(env, "SHUTDOWN_TIMEOUT", 25),
         health_file=env.get("HEALTH_FILE", "/tmp/worker-alive") or None,

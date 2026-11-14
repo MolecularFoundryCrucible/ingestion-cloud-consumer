@@ -100,3 +100,46 @@ def test_not_supported_queue_can_be_disabled():
 def test_secrets_are_not_in_repr():
     r = repr(load_config(dict(BASE, CRUCIBLE_API_KEY="SECRET-KEY", RABBITMQ_PASSWORD="SECRET-PW")))
     assert "SECRET-KEY" not in r and "SECRET-PW" not in r
+
+
+def test_direct_storage_is_off_by_default():
+    c = load_config(BASE)
+    assert (c.storage_backend, c.storage_buckets, c.work_dir) == ("", frozenset(), "/tmp/work")
+
+
+def test_gcs_direct_storage():
+    c = load_config(dict(BASE, STORAGE_BACKEND="gcs", STORAGE_BUCKETS="crucible-files, crucible-old"))
+    assert c.storage_backend == "gcs"
+    assert c.storage_buckets == frozenset({"crucible-files", "crucible-old"})
+
+
+def test_s3_direct_storage_with_key_files(tmp_path):
+    (tmp_path / "id").write_text("AKID\n")
+    (tmp_path / "secret").write_text("SECRET\n")
+    c = load_config(dict(BASE, STORAGE_BACKEND="s3", STORAGE_BUCKETS="crucible-files",
+                         S3_ENDPOINT_URL="http://seaweedfs:8333",
+                         S3_ACCESS_KEY_ID_FILE=str(tmp_path / "id"),
+                         S3_SECRET_ACCESS_KEY_FILE=str(tmp_path / "secret")))
+    assert (c.s3_endpoint_url, c.s3_region, c.s3_access_key_id, c.s3_secret_access_key) == (
+        "http://seaweedfs:8333", "us-east-1", "AKID", "SECRET")
+    assert "SECRET" not in repr(c)
+
+
+def test_s3_keys_may_come_from_the_environment_of_the_platform():
+    c = load_config(dict(BASE, STORAGE_BACKEND="s3", STORAGE_BUCKETS="b"))
+    assert (c.s3_access_key_id, c.s3_secret_access_key) == (None, None)
+
+
+def test_s3_keys_are_given_together():
+    with pytest.raises(ConfigError, match="S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY"):
+        load_config(dict(BASE, STORAGE_BACKEND="s3", STORAGE_BUCKETS="b", S3_ACCESS_KEY_ID="AKID"))
+
+
+@pytest.mark.parametrize("env,error", [
+    ({"STORAGE_BACKEND": "azure", "STORAGE_BUCKETS": "b"}, "STORAGE_BACKEND"),
+    ({"STORAGE_BACKEND": "gcs"}, "STORAGE_BUCKETS"),
+    ({"STORAGE_BACKEND": "gcs", "STORAGE_BUCKETS": "a/b"}, "STORAGE_BUCKETS"),
+])
+def test_invalid_direct_storage_fails_loudly(env, error):
+    with pytest.raises(ConfigError, match=error):
+        load_config(dict(BASE, **env))

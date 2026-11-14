@@ -74,7 +74,12 @@ Status flow, reported through the API: `started`, then one of `complete`, `faile
 There is one code path. The worker turns each job into a file reference and hands it to the ingestor; the ingestor reads it through fsspec, which treats local paths, mounted directories and remote URLs alike. What differs between deployments is only how the worker builds the reference:
 
 1. If `STORAGE_MOUNTS` maps the job's bucket to a directory, the reference is that local path. The deployment provides the mount: the Cloud Storage FUSE CSI driver on GKE, the Mountpoint for Amazon S3 CSI driver on other Kubernetes, a host mount (rclone, s3fs, or the store's own FUSE mount) bind-mounted on a single Docker host, or a plain directory. The worker never mounts anything itself.
-2. Otherwise the reference is a short-lived signed link from the API (`GET /files/{file_mfid}/download_link`). This needs no mounts, no storage credentials and no privileges, and works with every backend the API supports, so it is the default in the single-host quick start. The endpoint exists in production's API 3.3.1 as well (GCS-signed, one-hour expiry).
+2. Otherwise, if `STORAGE_BACKEND` is set and the job's bucket is listed in `STORAGE_BUCKETS`, the worker reads the object straight from the store under its own identity: Google Cloud Storage through Application Default Credentials (Workload Identity on GKE), or any S3-compatible store through `S3_ENDPOINT_URL` and a key (or the platform's credentials when no key is given). This is the standard pattern for a service on the same network as the store, and it works on a single host because nothing depends on the server's public address. The setting names match the API's, so a shared deployment hands the worker the same values. Reads use `obstore`, one compiled library for both stores with no Python dependencies; `gcsfs`/`s3fs` were rejected because botocore pins `python-dateutil` below 3, which would downgrade the parsers' environment, and boto3 has the same pin.
+3. Later, for a worker outside the store's network: a short-lived signed link from the API (`GET /files/{file_mfid}/download_link`). It needs no storage credentials, but a presigned URL is bound to the host it was signed for, so the server's public address must be a real name the worker can reach; a worker on the same host as a `localhost` installation cannot use it. Not implemented yet.
+
+The bucket allowlist matters for direct reads: a mount limits the worker to what is mounted, but store credentials may reach more, so the worker refuses any bucket not in `STORAGE_BUCKETS` (`file not found`, sent to the failed queue). A missing object is retried like a missing mounted file and ends as `file not found`; any other store error (credentials, endpoint, permissions) ends as `failed`. The object read is the current one: `storage_generation` is not pinned, as with mounts, because an S3 store may report an ETag rather than a version id there.
+
+Today a direct read downloads the whole object to a per-job directory under `WORK_DIR`, named after the basename of the original file name so parsers that check extensions keep working, and deletes it when the job ends, whatever the outcome. `WORK_DIR` therefore has to hold the largest file of the tier. Partial reads arrive with the ingestor input interface below. The target is:
 
 Reads are partial wherever the parser allows it: a parser that opens the reference as a file object reads only the byte ranges it needs, over HTTP range requests or through the mount, which matters because most ingestors read headers out of multi-gigabyte files. Parsers built on libraries that require a real path get one: a local reference is returned as is, and a remote one is downloaded once to `WORK_DIR` through fsspec's local cache and deleted after the job.
 
@@ -120,8 +125,13 @@ Configuration comes from environment variables. Each secret is given exactly one
 | `RABBITMQ_VHOST` | `/` | Broker virtual host |
 | `RABBITMQ_PASSWORD` | required, secret | Broker password |
 | `QUEUE` | required | Queue to consume, for example `ingestion-main-small` |
-| `STORAGE_MOUNTS` | empty | JSON map of bucket to directory; buckets not listed are read through signed links |
-| `WORK_DIR` | `/tmp/work` | Cache for remote files that a path-only parser needs |
+| `STORAGE_MOUNTS` | empty | JSON map of bucket to directory; a mount wins over a direct read |
+| `STORAGE_BACKEND` | empty | `gcs` or `s3` to read objects straight from the store; empty reads mounts only |
+| `STORAGE_BUCKETS` | required with a backend | Comma-separated buckets the worker may read directly |
+| `S3_ENDPOINT_URL` | empty | S3-compatible endpoint, for example `http://seaweedfs:8333`; empty for AWS |
+| `S3_REGION` | `us-east-1` | S3 region |
+| `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | empty, secrets | S3 key, given together; empty uses the platform's credentials |
+| `WORK_DIR` | `/tmp/work` | Scratch for downloaded files; must hold the largest file of the tier |
 | `LOG_LEVEL` | `INFO` | Logging level |
 
 Nothing in the code names a Foundry bucket, secret or host. The password is a secret of its own rather than part of a URL, so the Foundry keeps using its existing `rabbitmq_default_pw` and `crucible_admin_apikey` secrets unchanged. The Google Cloud libraries leave the default image, and reading secrets from Secret Manager becomes the deployment's job (the `_FILE` convention covers it). For the Foundry that means, before the first release ships: the GKE Secret Manager add-on enabled on `crucible-cluster`, and read access to the two secrets for the identity the consumers run as (the `default` Kubernetes service account today, through Workload Identity).
@@ -146,7 +156,7 @@ Nothing in the code names a Foundry bucket, secret or host. The password is a se
 
 The README leads with a quick start in the style of crucible-api's `deploy/compose` guide: requirements, numbered steps with copy-paste commands, and one check that proves it works.
 
-- Docker Compose: an optional overlay in crucible-api's compose bundle (`compose.ingestion.yaml`, alongside `compose.hub.yaml`) adds RabbitMQ and the worker to an existing installation, reading through signed links, with secrets in `secrets/`. A mounted directory is a documented option.
+- Docker Compose: an optional overlay in crucible-api's compose bundle (`compose.ingestion.yaml`, alongside `compose.hub.yaml`) adds RabbitMQ and the worker to an existing installation. The worker reads the bundle's SeaweedFS directly (`STORAGE_BACKEND=s3`, `S3_ENDPOINT_URL=http://seaweedfs:8333`) with the key in `secrets/`; a read-only key for the worker is a later improvement in the bundle.
 - Standalone: one `docker run` against an existing API and RabbitMQ.
 - Kubernetes: an example manifest for one tier, with the mounted-mode volume shown for GKE and for Mountpoint for Amazon S3.
 
@@ -166,7 +176,7 @@ Each step keeps production working; production is on API 3.3.1 and mounted acces
 
 1. Rename the repository and package; remove the auto-bump; Dockerfile hygiene; lock at `7a3078d`.
 2. Generic configuration with the Foundry's current values supplied by its deployment, reading through the existing mounts; same queues and message format. Heartbeat-safe threading and `prefetch_count=1`. First release to ghcr; the Foundry deploys it from `mf-crucible-deploy`.
-3. The ingestor input interface in crucible-ingestion; signed-link references in the worker (with `file_mfid` from the API, or looked up from the request); the compose overlay and the quick start. Then the benchmark that decides whether the Foundry keeps its mounts.
+3. Direct reads from GCS and S3 in the worker (done, unreleased). The ingestor input interface in crucible-ingestion; signed-link references in the worker (with `file_mfid` from the API, or looked up from the request); the compose overlay and the quick start. Then the benchmark that decides whether the Foundry keeps its mounts.
 4. Quorum queues with dead-lettering, coordinated with the API.
 5. Extract the shared core when the post-processing workers move over.
 

@@ -184,3 +184,104 @@ def test_connect_declares_work_failed_and_not_supported_queues(monkeypatch, tmp_
     assert ch.declared == ["ingestion-main-small", "ingestion-main-small-failed", "not-supported"]
     assert connection.params.credentials.username == "admin"
     assert connection.params.virtual_host == "/"
+
+
+DIRECT = {"STORAGE_MOUNTS": "", "STORAGE_BACKEND": "s3", "STORAGE_BUCKETS": "crucible-files"}
+
+
+def direct_handler(tmp_path, monkeypatch, **objects):
+    import obstore
+    from obstore.store import MemoryStore
+
+    from crucible_ingestion_worker.storage import ObjectStorage
+
+    store = MemoryStore()
+    for key, data in objects.items():
+        obstore.put(store, key, data)
+    handler, client, sleeps = make_handler(tmp_path, monkeypatch, WORK_DIR=str(tmp_path / "work"), **DIRECT)
+    handler.storage = ObjectStorage(handler.config, make_store=lambda bucket: store)
+    return handler, client, sleeps
+
+
+def test_direct_read_downloads_under_the_original_name_and_cleans_up(tmp_path, monkeypatch):
+    handler, client, _ = direct_handler(tmp_path, monkeypatch, **{"MF1/_files/abc": b"data"})
+    seen = {}
+
+    def fake_ingestion(**kwargs):
+        path = kwargs["dataset_to_process"]
+        seen["path"], seen["content"] = path, open(path, "rb").read()
+        return {"unique_id": "MF1"}, "SomeIngestor", True
+
+    monkeypatch.setattr(worker, "data_ingestion", fake_ingestion)
+    ch = FakeChannel()
+    _, raw = body(filename="crucible-files/MF1/_files/abc")
+    handler(ch, Method(), None, raw)
+    assert seen["content"] == b"data"
+    assert seen["path"].startswith(str(tmp_path / "work")) and seen["path"].endswith("/scan.h5")
+    assert statuses(client) == ["started", "complete"]
+    assert list((tmp_path / "work").iterdir()) == []
+    assert ch.acked == [7]
+
+
+def test_direct_read_cleans_up_when_the_parser_fails(tmp_path, monkeypatch):
+    handler, client, _ = direct_handler(tmp_path, monkeypatch, **{"MF1/_files/abc": b"data"})
+
+    def boom(**k):
+        raise ValueError("bad file")
+
+    monkeypatch.setattr(worker, "data_ingestion", boom)
+    ch = FakeChannel()
+    _, raw = body(filename="crucible-files/MF1/_files/abc")
+    handler(ch, Method(), None, raw)
+    assert statuses(client) == ["started", "failed"]
+    assert list((tmp_path / "work").iterdir()) == []
+
+
+def test_direct_read_missing_object_after_retries(tmp_path, monkeypatch):
+    handler, client, sleeps = direct_handler(tmp_path, monkeypatch)
+    ch = FakeChannel()
+    _, raw = body(filename="crucible-files/MF1/_files/abc")
+    handler(ch, Method(), None, raw)
+    assert statuses(client) == ["started", "file not found"]
+    assert sleeps == [2, 4, 8, 16]
+    assert ch.acked == [7] and ch.published == []
+
+
+def test_direct_read_store_error_is_failed_not_file_not_found(tmp_path, monkeypatch):
+    handler, client, sleeps = direct_handler(tmp_path, monkeypatch)
+
+    def denied(bucket, key):
+        raise PermissionError("access denied")
+
+    handler.storage.exists = denied
+    ch = FakeChannel()
+    msg, raw = body(filename="crucible-files/MF1/_files/abc")
+    handler(ch, Method(), None, raw)
+    assert statuses(client) == ["started", "failed"]
+    assert sleeps == []
+    assert ch.published == [("ingestion-main-small-failed", msg)] and ch.acked == [7]
+
+
+def test_direct_read_refuses_buckets_not_configured(tmp_path, monkeypatch):
+    handler, client, _ = direct_handler(tmp_path, monkeypatch)
+    ch = FakeChannel()
+    msg, raw = body(filename="someone-elses-bucket/MF1/_files/abc")
+    handler(ch, Method(), None, raw)
+    assert statuses(client) == ["file not found"]
+    assert ch.published == [("ingestion-main-small-failed", msg)]
+
+
+def test_a_mount_wins_over_direct_reads(tmp_path, monkeypatch):
+    (tmp_path / "MF1" / "_files").mkdir(parents=True)
+    (tmp_path / "MF1" / "_files" / "abc").write_text("data")
+    handler, client, _ = make_handler(tmp_path, monkeypatch, STORAGE_BACKEND="gcs", STORAGE_BUCKETS="mf-storage-prod")
+
+    def no_direct(*a):
+        raise AssertionError("the mount should be used")
+
+    handler.storage.exists = handler.storage.download = no_direct
+    seen = {}
+    monkeypatch.setattr(worker, "data_ingestion", lambda **k: (seen.update(k), ({"unique_id": "MF1"}, "I", True))[1])
+    handler(FakeChannel(), Method(), None, body()[1])
+    assert seen["dataset_to_process"] == f"{tmp_path}/MF1/_files/abc"
+    assert statuses(client) == ["started", "complete"]

@@ -3,11 +3,13 @@ import json
 import logging
 import os
 import signal
+import tempfile
 import threading
 import time
+from contextlib import contextmanager
 from importlib.metadata import version
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional, Tuple
 
 import requests
 
@@ -15,7 +17,7 @@ from crucible_ingestion import data_ingestion
 from crucible_ingestion.utils import get_ingestion_githash
 
 from .config import Config
-from .storage import file_exists, resolve_path
+from .storage import ObjectStorage, file_exists, local_name, resolve_path
 
 logger = logging.getLogger(__name__)
 
@@ -35,10 +37,12 @@ class JobHandler:
     (dataset), ingestion_class, and optionally file_name and storage_generation.
     """
 
-    def __init__(self, config: Config, client, sleep: Callable[[float], None] = time.sleep):
+    def __init__(self, config: Config, client, sleep: Callable[[float], None] = time.sleep,
+                 storage: Optional[ObjectStorage] = None):
         self.config = config
         self.client = client
         self.sleep = sleep
+        self.storage = storage or ObjectStorage(config)
         self.version = ingestion_version()
 
     def _fail(self, ch, message: dict, status: str, **fields) -> None:
@@ -55,8 +59,9 @@ class JobHandler:
             return
         reqid = message["reqid"]
         local_path, bucket = resolve_path(message["filename"], self.config.storage_mounts)
-        if local_path is None:
-            logger.error(f"Unexpected filename format, cannot resolve path: {message['filename']}")
+        remote = self.storage.locate(message["filename"]) if local_path is None else None
+        if local_path is None and remote is None:
+            logger.error(f"Cannot resolve {message['filename']}: no mount covers it and its bucket is not in STORAGE_BUCKETS")
             self.client.ingestions.update(reqid, status="file not found")
             ch.basic_publish(exchange="", routing_key=self.config.failed_queue, body=json.dumps(message))
             ch.basic_ack(delivery_tag=method.delivery_tag)
@@ -65,35 +70,40 @@ class JobHandler:
         logger.info(f"received message {message} .. starting processing")
         self.client.ingestions.update(reqid, status="started", ingestion_githash=self.version)
 
-        for attempt in range(1, MAX_FILE_RETRIES + 1):
-            if file_exists(local_path, bucket, self.config.storage_mounts, self.config.storage_exists_check):
-                break
-            if attempt < MAX_FILE_RETRIES:
-                logger.warning(f"[x] File not found, retry {attempt}/{MAX_FILE_RETRIES} for {body}")
-                self.sleep(2 ** attempt)
-            else:
-                logger.error(f"[x] Received {body} but file not found after {MAX_FILE_RETRIES} attempts")
-                self.client.ingestions.update(reqid, status="file not found")
-                ch.basic_ack(delivery_tag=method.delivery_tag)
-                return
-
         ingestion_class = None
         try:
-            for attempt in range(1, MAX_INGEST_RETRIES + 1):
-                try:
-                    ds, ingestion_class, supported = data_ingestion(dataset_to_process=local_path,
-                                                                    dsid=message["dsid"],
-                                                                    ingestion_class=message["ingestion_class"],
-                                                                    include_file=False,
-                                                                    file_name=message.get("file_name"))
+            for attempt in range(1, MAX_FILE_RETRIES + 1):
+                if remote:
+                    found = self.storage.exists(*remote)
+                else:
+                    found = file_exists(local_path, bucket, self.config.storage_mounts, self.config.storage_exists_check)
+                if found:
                     break
-                except requests.exceptions.HTTPError as err:
-                    not_found = err.response is not None and err.response.status_code == 404
-                    if not_found and attempt < MAX_INGEST_RETRIES:
-                        logger.warning(f"[x] Dataset not yet visible, retry {attempt}/{MAX_INGEST_RETRIES}: {err}")
-                        self.sleep(2 ** attempt)
-                        continue
-                    raise
+                if attempt < MAX_FILE_RETRIES:
+                    logger.warning(f"[x] File not found, retry {attempt}/{MAX_FILE_RETRIES} for {body}")
+                    self.sleep(2 ** attempt)
+                else:
+                    logger.error(f"[x] Received {body} but file not found after {MAX_FILE_RETRIES} attempts")
+                    self.client.ingestions.update(reqid, status="file not found")
+                    ch.basic_ack(delivery_tag=method.delivery_tag)
+                    return
+
+            with self._local_copy(message, local_path, remote) as path:
+                for attempt in range(1, MAX_INGEST_RETRIES + 1):
+                    try:
+                        ds, ingestion_class, supported = data_ingestion(dataset_to_process=path,
+                                                                        dsid=message["dsid"],
+                                                                        ingestion_class=message["ingestion_class"],
+                                                                        include_file=False,
+                                                                        file_name=message.get("file_name"))
+                        break
+                    except requests.exceptions.HTTPError as err:
+                        not_found = err.response is not None and err.response.status_code == 404
+                        if not_found and attempt < MAX_INGEST_RETRIES:
+                            logger.warning(f"[x] Dataset not yet visible, retry {attempt}/{MAX_INGEST_RETRIES}: {err}")
+                            self.sleep(2 ** attempt)
+                            continue
+                        raise
 
             if not supported:
                 self.client.ingestions.update(reqid, status="not supported", ingestion_githash=self.version)
@@ -110,6 +120,18 @@ class JobHandler:
             logger.error(f"[x] Received {body} but failed with error {err}")
             self._fail(ch, message, "failed", ingestion_githash=self.version, ingestion_class=ingestion_class)
             ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    @contextmanager
+    def _local_copy(self, message: dict, local_path: Optional[str], remote: Optional[Tuple[str, str]]) -> Iterator[str]:
+        """The file as a local path: the mounted path, or a download that is deleted after the job."""
+        if remote is None:
+            yield local_path
+            return
+        os.makedirs(self.config.work_dir, exist_ok=True)
+        with tempfile.TemporaryDirectory(dir=self.config.work_dir) as scratch:
+            path = os.path.join(scratch, local_name(message.get("file_name"), remote[1]))
+            self.storage.download(*remote, path)
+            yield path
 
 
 class ThreadSafeChannel:
