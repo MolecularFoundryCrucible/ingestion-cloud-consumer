@@ -142,3 +142,14 @@ def test_local_name_shortens_long_names_and_keeps_the_extension():
     name = storage.local_name("é" * 600 + ".tar.gz", "MF1/_files/abc")
     assert len(name.encode()) <= 200
     assert name.endswith(".gz")
+
+
+def test_gcs_blob_exists_reads_through_obstore(monkeypatch):
+    import obstore
+    from obstore.store import MemoryStore
+
+    store = MemoryStore()
+    obstore.put(store, "MF123/_files/abc", b"x")
+    monkeypatch.setattr(storage, "_gcs_store", lambda bucket: store)
+    assert storage.gcs_blob_exists("mf-storage-prod", "MF123/_files/abc") is True
+    assert storage.gcs_blob_exists("mf-storage-prod", "MF123/_files/missing") is False

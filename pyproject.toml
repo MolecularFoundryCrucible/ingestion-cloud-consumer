@@ -6,9 +6,7 @@ description = "Crucible ingestion worker: runs crucible-ingestion parsers on job
 requires-python = ">=3.11"
 dependencies = [
     "crucible-ingestion==0.2.0",
-    "google-auth>=2.49.1",
     "google-cloud-secret-manager>=2.27.0",
-    "google-cloud-storage>=3.1.0",
     "obstore>=0.12.1",
     "pika>=1.3.2",
 ] 

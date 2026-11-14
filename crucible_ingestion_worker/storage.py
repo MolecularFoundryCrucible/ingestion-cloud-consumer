@@ -1,3 +1,4 @@
+import functools
 import logging
 import os
 from typing import Callable, Optional, Tuple
@@ -22,10 +23,21 @@ def resolve_path(storage_path: str, mounts: dict) -> Tuple[Optional[str], Option
     return None, None
 
 
-def gcs_blob_exists(bucket: str, key: str) -> bool:
-    from google.cloud import storage
+@functools.lru_cache(maxsize=None)
+def _gcs_store(bucket: str):
+    from obstore.store import GCSStore
 
-    return storage.Client().bucket(bucket).blob(key).exists()
+    return GCSStore(bucket)
+
+
+def gcs_blob_exists(bucket: str, key: str) -> bool:
+    import obstore
+
+    try:
+        obstore.head(_gcs_store(bucket), key)
+    except FileNotFoundError:
+        return False
+    return True
 
 
 def file_exists(local_path: str, bucket: Optional[str], mounts: dict, exists_check: str) -> bool:
