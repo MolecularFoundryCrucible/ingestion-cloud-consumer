@@ -104,4 +104,4 @@ uv sync
 uv run pytest
 ```
 
-`CRUCIBLE_INGESTION_SPEC` builds the image against another crucible-ingestion, such as a pre-release or a branch: `docker build --build-arg CRUCIBLE_INGESTION_SPEC=crucible-ingestion==0.3.0a1 .`. Releases are built from `uv.lock`.
+`CRUCIBLE_INGESTION_SPEC` builds the image against another crucible-ingestion, such as a pre-release or a branch: `docker build --build-arg CRUCIBLE_INGESTION_SPEC=crucible-ingestion==0.3.0a1 .`. Releases are built from `uv.lock`; [docs/releasing.md](docs/releasing.md) covers the changelog and cutting a release.

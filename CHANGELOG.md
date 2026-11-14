@@ -1,6 +1,6 @@
 # Changelog
 
-Changes that affect operators of the worker. Add entries under `Unreleased` in the same change.
+Changes that affect operators of the worker. How to write entries and cut a release: [docs/releasing.md](docs/releasing.md).
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and releases follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
