@@ -18,4 +18,4 @@ RUN uv sync --locked --no-install-project
 COPY --chown=worker:worker . .
 RUN uv sync --locked
 
-CMD ["/app/.venv/bin/python", "-m", "ingestion_consumer.ingestion_process"]
+CMD ["/app/.venv/bin/python", "-m", "crucible_ingestion_worker"]
