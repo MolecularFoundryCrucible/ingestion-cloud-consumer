@@ -22,8 +22,14 @@ class FakeChannel:
 
 
 class FakeIngestions:
-    def __init__(self):
+    def __init__(self, status="requested"):
         self.calls = []
+        self.status = status
+
+    def get(self, reqid):
+        if isinstance(self.status, Exception):
+            raise self.status
+        return {"id": reqid, "status": self.status}
 
     def update(self, reqid, status=None, **fields):
         self.calls.append((reqid, status, fields))
@@ -284,4 +290,39 @@ def test_a_mount_wins_over_direct_reads(tmp_path, monkeypatch):
     monkeypatch.setattr(worker, "data_ingestion", lambda **k: (seen.update(k), ({"unique_id": "MF1"}, "I", True))[1])
     handler(FakeChannel(), Method(), None, body()[1])
     assert seen["dataset_to_process"] == f"{tmp_path}/MF1/_files/abc"
+    assert statuses(client) == ["started", "complete"]
+
+
+def test_a_completed_request_is_not_run_again(tmp_path, monkeypatch):
+    handler, client, _ = make_handler(tmp_path, monkeypatch)
+    client.ingestions.status = "complete"
+
+    def must_not_run(**k):
+        raise AssertionError("a completed request must not be parsed again")
+
+    monkeypatch.setattr(worker, "data_ingestion", must_not_run)
+    ch = FakeChannel()
+    handler(ch, Method(), None, body()[1])
+    assert client.ingestions.calls == []
+    assert ch.acked == [7] and ch.published == []
+
+
+@pytest.mark.parametrize("status", ["started", "failed", "not supported", "file not found"])
+def test_other_statuses_run_again(tmp_path, monkeypatch, status):
+    (tmp_path / "MF1" / "_files").mkdir(parents=True)
+    (tmp_path / "MF1" / "_files" / "abc").write_text("data")
+    handler, client, _ = make_handler(tmp_path, monkeypatch)
+    client.ingestions.status = status
+    monkeypatch.setattr(worker, "data_ingestion", lambda **k: ({"unique_id": "MF1"}, "I", True))
+    handler(FakeChannel(), Method(), None, body()[1])
+    assert statuses(client) == ["started", "complete"]
+
+
+def test_status_lookup_failure_does_not_block_the_job(tmp_path, monkeypatch):
+    (tmp_path / "MF1" / "_files").mkdir(parents=True)
+    (tmp_path / "MF1" / "_files" / "abc").write_text("data")
+    handler, client, _ = make_handler(tmp_path, monkeypatch)
+    client.ingestions.status = requests.exceptions.ConnectionError("api down")
+    monkeypatch.setattr(worker, "data_ingestion", lambda **k: ({"unique_id": "MF1"}, "I", True))
+    handler(FakeChannel(), Method(), None, body()[1])
     assert statuses(client) == ["started", "complete"]

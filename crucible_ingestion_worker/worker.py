@@ -58,6 +58,10 @@ class JobHandler:
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
         reqid = message["reqid"]
+        if self._already_complete(reqid):
+            logger.info(f"Request {reqid} is already complete; acknowledging the redelivered job without running it")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
         local_path, bucket = resolve_path(message["filename"], self.config.storage_mounts)
         remote = self.storage.locate(message["filename"]) if local_path is None else None
         if local_path is None and remote is None:
@@ -120,6 +124,15 @@ class JobHandler:
             logger.error(f"[x] Received {body} but failed with error {err}")
             self._fail(ch, message, "failed", ingestion_githash=self.version, ingestion_class=ingestion_class)
             ch.basic_ack(delivery_tag=method.delivery_tag)
+
+    def _already_complete(self, reqid) -> bool:
+        """Only a completed run has side effects worth guarding against (thumbnails are added again);
+        other statuses may be retried on purpose."""
+        try:
+            return self.client.ingestions.get(reqid).get("status") == "complete"
+        except Exception as err:
+            logger.warning(f"Could not look up request {reqid}, running it: {err}")
+            return False
 
     @contextmanager
     def _local_copy(self, message: dict, local_path: Optional[str], remote: Optional[Tuple[str, str]]) -> Iterator[str]:
