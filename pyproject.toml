@@ -1,6 +1,6 @@
 [project]
 name = 'crucible-ingestion-worker'
-version = '0.2.0'
+version = '0.3.0'
 
 description = "Crucible ingestion worker: runs crucible-ingestion parsers on jobs queued by a Crucible API"
 requires-python = ">=3.11"

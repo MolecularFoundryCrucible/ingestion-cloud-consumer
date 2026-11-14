@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
 ### Added
 
 - The worker reads files straight from Google Cloud Storage or an S3-compatible store when no mount covers the job's bucket: `STORAGE_BACKEND` (`gcs` or `s3`), `STORAGE_BUCKETS` (the buckets it may read), and for S3 `S3_ENDPOINT_URL`, `S3_REGION`, `S3_ACCESS_KEY_ID` and `S3_SECRET_ACCESS_KEY`. GCS uses Application Default Credentials (Workload Identity on GKE); S3 without a key uses the platform's credentials. The file is downloaded to `WORK_DIR` (default `/tmp/work`), which must hold the largest file of the tier, and deleted after the job. A configured mount still takes precedence.
@@ -36,5 +38,6 @@ First release from this repository, renamed from `ingestion-cloud-consumer`. It 
 - A message that cannot be read, or that fails in an unexpected way, moves to the failed queue instead of crashing the worker.
 - Images are published to ghcr from version tags, with the crucible-ingestion version as a label; `CRUCIBLE_INGESTION_SPEC` builds against another crucible-ingestion for testing.
 
-[Unreleased]: https://github.com/MolecularFoundryCrucible/crucible-ingestion-worker/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/MolecularFoundryCrucible/crucible-ingestion-worker/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/MolecularFoundryCrucible/crucible-ingestion-worker/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/MolecularFoundryCrucible/crucible-ingestion-worker/releases/tag/v0.2.0
