@@ -1,0 +1,89 @@
+name: Release image
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      crucible_ingestion_spec:
+        description: "Override the locked crucible-ingestion, e.g. crucible-ingestion==0.3.0a1 or git+https://github.com/MolecularFoundryCrucible/crucible-ingestion@main (build only)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-image-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/molecularfoundrycrucible/crucible-ingestion-worker
+  PUBLISH: ${{ github.ref_type == 'tag' }}
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - run: uv run --locked pytest -q
+
+  build:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          SPEC: ${{ inputs.crucible_ingestion_spec }}
+        run: |
+          set -euo pipefail
+          declared="$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml", "rb"))["project"]["version"])')"
+          if [ "$PUBLISH" = true ]; then
+            version="${REF_NAME#v}"
+            [ "$version" = "$declared" ] || { echo "Tag $REF_NAME does not match version $declared in pyproject.toml" >&2; exit 1; }
+            [ -z "$SPEC" ] || { echo "Releases are built from uv.lock; the override is for build-only runs" >&2; exit 1; }
+          else
+            version="$declared"
+          fi
+          locked="$(python3 -c 'import tomllib; print(next(p["version"] for p in tomllib.load(open("uv.lock", "rb"))["package"] if p["name"] == "crucible-ingestion"))')"
+          ingestion="${SPEC:-$locked}"
+          if [ "$PUBLISH" = true ]; then
+            tags=(--tag "$IMAGE:$version")
+            if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then tags+=(--tag "$IMAGE:${version%.*}"); fi
+            output="type=image,push=true"
+          else
+            tags=(--tag "$IMAGE:build-only")
+            output="type=cacheonly"
+          fi
+          docker buildx create --use --driver docker-container
+          docker buildx build . \
+            --platform linux/amd64 \
+            --build-arg "CRUCIBLE_INGESTION_SPEC=$SPEC" \
+            "${tags[@]}" \
+            --label "org.opencontainers.image.title=Crucible ingestion worker" \
+            --label "org.opencontainers.image.description=Runs crucible-ingestion parsers on jobs queued by a Crucible API" \
+            --label "org.opencontainers.image.source=$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+            --label "org.opencontainers.image.version=$version" \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --label "gov.lbl.crucible.ingestion.version=$ingestion" \
+            --provenance=mode=max \
+            --sbom=true \
+            --metadata-file metadata.json \
+            --output "$output"
+          if [ "$PUBLISH" = true ]; then
+            digest="$(jq -r '."containerimage.digest"' metadata.json)"
+            echo "Published $IMAGE:$version@$digest (crucible-ingestion $ingestion)" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi

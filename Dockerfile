@@ -18,4 +18,7 @@ RUN uv sync --locked --no-install-project
 COPY --chown=worker:worker . .
 RUN uv sync --locked
 
+ARG CRUCIBLE_INGESTION_SPEC=""
+RUN if [ -n "$CRUCIBLE_INGESTION_SPEC" ]; then uv pip install --python /app/.venv/bin/python "$CRUCIBLE_INGESTION_SPEC"; fi
+
 CMD ["/app/.venv/bin/python", "-m", "crucible_ingestion_worker"]
