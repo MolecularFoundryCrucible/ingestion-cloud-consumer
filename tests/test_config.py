@@ -20,7 +20,12 @@ def test_minimal_config_and_defaults():
     assert c.failed_queue == "ingestion-main-small-failed"
     assert c.not_supported_queue == "not-supported"
     assert c.storage_mounts == {} and c.storage_exists_check == ""
-    assert c.prefetch_count == 10 and c.log_level == "INFO"
+    assert c.prefetch_count == 1 and c.log_level == "INFO"
+    assert (c.shutdown_timeout, c.health_file, c.health_interval) == (25, "/tmp/worker-alive", 15)
+
+
+def test_health_file_can_be_disabled():
+    assert load_config(dict(BASE, HEALTH_FILE="")).health_file is None
 
 
 def test_foundry_style_config():

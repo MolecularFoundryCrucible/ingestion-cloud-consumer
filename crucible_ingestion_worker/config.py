@@ -51,6 +51,9 @@ class Config:
     storage_mounts: dict
     storage_exists_check: str
     log_level: str
+    shutdown_timeout: int
+    health_file: Optional[str]
+    health_interval: int
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -105,8 +108,11 @@ def load_config(env: Mapping[str, str] = os.environ) -> Config:
         queue=queue,
         failed_queue=env.get("FAILED_QUEUE") or f"{queue}-failed",
         not_supported_queue=env.get("NOT_SUPPORTED_QUEUE", "not-supported") or None,
-        prefetch_count=_integer(env, "PREFETCH_COUNT", 10),
+        prefetch_count=_integer(env, "PREFETCH_COUNT", 1),
         storage_mounts=_storage_mounts(env),
         storage_exists_check=exists_check,
         log_level=env.get("LOG_LEVEL") or "INFO",
+        shutdown_timeout=_integer(env, "SHUTDOWN_TIMEOUT", 25),
+        health_file=env.get("HEALTH_FILE", "/tmp/worker-alive") or None,
+        health_interval=_integer(env, "HEALTH_INTERVAL", 15),
     )
