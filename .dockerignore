@@ -11,5 +11,3 @@ temp_creds.json
 .pytest_cache
 docs
 tests
-k8s-conf-*.yaml
-cloudbuild.yaml
