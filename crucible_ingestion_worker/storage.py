@@ -51,8 +51,17 @@ def local_name(file_name: Optional[str], key: str) -> str:
     for candidate in (file_name, key):
         name = os.path.basename((candidate or "").replace("\\", "/"))
         if name not in ("", ".", ".."):
-            return name
+            return _shorten(name)
     return "input"
+
+
+def _shorten(name: str, limit: int = 200) -> str:
+    if len(name.encode()) <= limit:
+        return name
+    stem, extension = os.path.splitext(name)
+    extension = extension if len(extension.encode()) <= 32 else ""
+    budget = limit - len(extension.encode())
+    return stem.encode()[:budget].decode(errors="ignore") + extension
 
 
 class ObjectStorage:

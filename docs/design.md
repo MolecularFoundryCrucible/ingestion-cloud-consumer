@@ -166,7 +166,7 @@ The post-processing workers (rga-analysis, mosaic-stitch, insitu-aggregation, ca
 
 ## Changes outside this repository
 
-- crucible-api: allow ingestion for non-GCS storage (it refuses any `storage_backend` other than `gcs` today); add `file_mfid` and `contract_version` to the job; document the worker contract; agree queue names and arguments (quorum, delivery limit, dead-letter); add the compose overlay.
+- crucible-api: nothing blocks ingestion on an S3 installation (uploaded files are API-managed; the refusal of `storage_backend` other than `gcs` concerns catalog-only records); add `file_mfid` and `contract_version` to the job; document the worker contract; agree queue names and arguments (quorum, delivery limit, dead-letter); add the compose overlay.
 - mf-crucible-deploy: set the Foundry's configuration explicitly in `crucible-prod/ingestion/` (mounts, API URL, queue, secrets through files) before an image without the old defaults reaches production; deliver secrets through the GKE Secret Manager add-on or Kubernetes Secrets; consider queue-length scaling.
 - crucible-ingestion (also maintained by this team): the input interface above, the `fsspec` dependency, rerun safety (skip existing thumbnails), and retiring the `notify-consumer` workflow.
 

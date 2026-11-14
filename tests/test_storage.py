@@ -136,3 +136,9 @@ def test_exists_and_download(tmp_path):
 ])
 def test_local_name_keeps_only_a_safe_basename(file_name, key, expected):
     assert storage.local_name(file_name, key) == expected
+
+
+def test_local_name_shortens_long_names_and_keeps_the_extension():
+    name = storage.local_name("é" * 600 + ".tar.gz", "MF1/_files/abc")
+    assert len(name.encode()) <= 200
+    assert name.endswith(".gz")
